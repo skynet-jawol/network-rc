@@ -1,164 +1,106 @@
 #!/bin/bash
 
+echo "Network RC 安装脚本"
+echo "=================="
 
-
-VERSION_CODENAME=$(lsb_release -cs);
-if [ "$VERSION_CODENAME" != "buster" ]; then
-    echo "只支持 buster 系统"
-    exit 1
+# 检查是否为root用户
+if [ "$EUID" -ne 0 ]; then
+  echo "请使用 sudo 运行此脚本"
+  exit 1
 fi
 
-if test "$NETWORK_RC_BETA" = "1"; then
-  echo '安装 Beta 版'
-fi
+# 设置密码
+read -p "设置访问密码(可选):" password
+password=${password:-""}
 
-if test "$NETWORK_RC_VERSION" = ""; then
-  echo '安装最新版本'
-  DOWNLOAD_LINK='https://download.esonwong.com/network-rc/network-rc.tar.gz'
-else
-  echo '开始安装 Network RC 版本: '$NETWORK_RC_VERSION
-  DOWNLOAD_LINK="https://download.esonwong.com/network-rc/network-rc-${NETWORK_RC_VERSION}.tar.gz"
-fi
+# 设置子域名
+read -p "设置子域名(可选):" subDomain
+subDomain=${subDomain:-""}
 
-read -p "使用内置 frp 服务器(yes/no, 默认 yes):" defaultFrp
-defaultFrp=${defaultFrp:-yes}
-
-echo defaultFrp: $defaultFrp
-
-if [ "$defaultFrp" = "yes" ] || [ "$defaultFrp" = "y"  ]; then
-  defaultFrp=true
-  defaultSubDomain=$(cat /proc/sys/kernel/random/uuid | cut -c 1-4)
-  read -p "域名前缀(默认 $defaultSubDomain):" subDomain
-  subDomain=${subDomain:-$defaultSubDomain}
-else
-  defaultFrpcConfig="/home/pi/frpc.ini"
-  read -p "frpc 配置文件地址(默认 $defaultFrpcConfig):" frpcConfig
-  frpcConfig=${frpcConfig:-$defaultFrpcConfig}
-fi
-
-read -p "Network RC 密码(默认 networkrc):" password
-password=${password:-networkrc}
-
-read -p "本地端口(默认 8080):" localPort
+# 设置本地端口
+read -p "设置本地端口(默认 8080):" localPort
 localPort=${localPort:-8080}
 
+echo "配置信息:"
+echo "  - 密码: ${password:-"无"}"
+echo "  - 子域名: ${subDomain:-"无"}"
+echo "  - 本地端口: $localPort"
+
+# 安装依赖
+echo "正在安装依赖..."
+apt update
+apt install -y nodejs npm ffmpeg pulseaudio libpulse-dev
+
+# 下载项目
+echo "正在下载项目..."
+cd /home/pi
+rm -rf network-rc
+git clone https://github.com/esonwong/network-rc.git
+cd network-rc
+
+# 安装依赖
+echo "正在安装项目依赖..."
+npm install
+
+# 构建前端
+echo "正在构建前端..."
+cd front-end
+npm install
+npm run build
+cd ..
+
+# 创建配置文件
+echo "正在创建配置文件..."
+cat > /home/pi/network-rc/config.json << EOF
+{
+  "password": "$password",
+  "localPort": $localPort,
+  "subDomain": "$subDomain"
+}
+EOF
+
+# 创建systemd服务
+echo "正在创建系统服务..."
+cat > /etc/systemd/system/network-rc.service << EOF
+[Unit]
+Description=Network RC Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/network-rc
+ExecStart=/usr/bin/node /home/pi/network-rc/index.js --password "$password" --localPort "$localPort"
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 启用并启动服务
+echo "正在启动服务..."
+systemctl daemon-reload
+systemctl enable network-rc
+systemctl start network-rc
+
+echo "安装完成！"
+echo "服务状态:"
+systemctl status network-rc --no-pager
+
 echo ""
-echo ""
-echo ""
-echo "你的设置如下"
-echo "----------------------------------------"
-if [ $defaultFrp = true ]; then
-  echo "域名前缀: $subDomain"
-  echo "Network RC 控制界面访问地址: https://${subDomain}.nrc.esonwong.com:9000";
-else
-  echo "使用自定义 frp 服务器"
-  echo "frpc 配置文件地址: $frpcConfig"
+echo "访问地址:"
+echo "  - 本地: http://$(hostname -I | awk '{print $1}'):$localPort"
+if [ -n "$subDomain" ]; then
+  echo "  - 远程: https://$subDomain.nrc.esonwong.com:9000"
 fi
-echo "Network RC 控制界面访问密码: $password"
-echo "本地端口: $localPort"
+
 echo ""
-echo ""
-echo ""
-
-
-read -p "输入 ok 继续安装， 输入其他结束:" ok
-echo "$ok"
-
-
-if [ "$ok" = "ok" ]; then
-  echo ""
-  echo ""
-  echo ""
-  if sudo apt update; then
-    echo "apt update 成功"
-  else
-    echo "apt update 失败"
-    exit 1
-  fi
-
-  echo "安装依赖..."
-  if sudo apt install ffmpeg pulseaudio -y; then
-    echo "安装依赖成功"
-  else
-    echo "安装依赖失败"
-    exit 1
-  fi
-
-
-  echo ""
-  echo ""
-  echo ""
-  sudo rm -f /tmp/network-rc.tar.gz
-  if test "$NETWORK_RC_BETA" = "1"; then
-    echo "下载 Network RC beta 版本"
-    if wget -O /tmp/network-rc.tar.gz https://download.esonwong.com/network-rc/network-rc-beta.tar.gz; then
-      echo "下载成功"
-    else
-      echo "下载失败"
-      exit 1
-    fi 
-  else
-    echo "下载 Network RC"
-    if wget -O /tmp/network-rc.tar.gz $DOWNLOAD_LINK; then
-      echo "下载成功"
-    else
-      echo "下载失败"
-      exit 1
-    fi
-  fi
-
-  echo ""
-  echo ""
-  echo ""
-  echo "解压 Network RC 中..."
-  tar -zxf /tmp/network-rc.tar.gz -C /home/pi/
-
-
-  echo ""
-  echo ""
-  echo ""
-  echo "安装 Network RC 服务"
-
-  echo "[Unit]
-  Description=network-rc
-  After=syslog.target  network.target
-  Wants=network.target
-
-  [Service]
-  User=pi
-  Type=simple
-  ExecStart=/home/pi/network-rc/node /home/pi/network-rc/index.js --frpConfig \"$frpcConfig\" --password \"$password\" --subDomain \"$subDomain\" --localPort \"$localPort\"
-  Restart=always
-  RestartSec=15s
-
-  [Install]
-  WantedBy=multi-user.target" | sudo tee /etc/systemd/system/network-rc.service
-
-  echo ""
-  echo ""
-  echo "创建 Network RC 服务完成"
-
-
-  sudo systemctl enable network-rc.service
-  echo "重启 Network RC 服务"
-  sudo systemctl restart network-rc.service
-
-
-  echo ""
-  echo ""
-  echo ""
-  echo "安装完成"
-  if [ $defaultFrp = true ]; then
-    echo "域名前缀: $subDomain"
-    echo "Network RC 控制界面访问地址: https://${subDomain}.nrc.esonwong.com:9000"
-  else
-    echo "frpc 配置文件地址: $frpcConfig"
-  fi
-  echo "Network RC 控制界面访问密码: $password"
-
-else 
-  exit 0
-fi
+echo "管理命令:"
+echo "  - 查看状态: sudo systemctl status network-rc"
+echo "  - 重启服务: sudo systemctl restart network-rc"
+echo "  - 停止服务: sudo systemctl stop network-rc"
+echo "  - 查看日志: sudo journalctl -u network-rc -f"
 
 
 

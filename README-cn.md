@@ -56,12 +56,6 @@ node index.js
 
 # 设置密码
 node index.js -p password
-
-# 启用网络穿透
-node index.js -f -o 9088 --tsl
-
-# 自定义网络穿透服务器
-node index.js -f -o 9088 --frpServer xxxxxxxxxx --frpServerPort xxx --frpServerToken xxxxx
 ```
 
 ## 接线图
@@ -91,7 +85,6 @@ node index.js -f -o 9088 --frpServer xxxxxxxxxx --frpServerPort xxx --frpServerT
 - [x] 设置麦克风灵敏度
 - [x] 摄像头 bug
 - [x] 一键安装脚本
-- [x] 添加远程获取 frps 配置的功能
 - [x] 自定义通道
 - [x] 修复云台舵机的卡顿
 - [x] 保存车子运行的相关状态
@@ -99,12 +92,8 @@ node index.js -f -o 9088 --frpServer xxxxxxxxxx --frpServerPort xxx --frpServerT
 - [x] 修复摄像头数量检测错误
 - [x] 播放手机端录制的音频
 - [x] 支持自定义证书
-- [x] frp 运行添加 user 参数
-- [x] ~~替换播放声音的程序~~
 - [x] 更新支持者列表
 - [x] 添加摄像头画面重置按钮
-- [x] 更新内置 frp 配置
-- [x] 为本人提供的 frp 服务启用 https
 - [x] 网络连接响应时间超过 500 毫秒自动刹车
 - [x] ping 值显示
 - [x] 支持手柄
@@ -138,4 +127,3 @@ node index.js -f -o 9088 --frpServer xxxxxxxxxx --frpServerPort xxx --frpServerT
 - [rpio](https://github.com/jperkin/node-rpio)
 - [rpio-pwm](https://github.com/xinkaiwang/rpio-pwm)
 - [xf-tts-socket](https://github.com/jimuyouyou/xf-tts-socket)
-- Eson Wong - 提供免费的 frp 服务器

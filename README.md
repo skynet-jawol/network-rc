@@ -89,4 +89,3 @@ How to join a group: add personal WeChat account `EsonWong_`, remark `Network RC
 - [rpio](https://github.com/jperkin/node-rpio)
 - [rpio-pwm](https://github.com/xinkaiwang/rpio-pwm)
 - [xf-tts-socket](https://github.com/jimuyouyou/xf-tts-socket)
-- Eson Wong - Providing free FRP server
